@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>直播录制管理器</title>
+<style>
+  :root {
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #F8FAFC;
+    --surface-3: #EEF2F7;
+    --border: #E4E9F0;
+    --border-strong: #D5DCE6;
+    --text-1: #0F172A;
+    --text-2: #556074;
+    --text-3: #94A3B8;
+    --brand: #2563EB;
+    --brand-600: #1D4ED8;
+    --brand-soft: #EAF1FE;
+    --rec: #DC2626;
+    --rec-soft: #FEECEC;
+    --ok: #16A34A;
+    --ok-soft: #E9F7EF;
+    --warn: #B45309;
+    --warn-soft: #FEF3E2;
+    --shadow-1: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
+    --shadow-2: 0 4px 12px rgba(16,24,40,.08), 0 12px 32px rgba(16,24,40,.12);
+    --r-panel: 14px;
+    --r-ctl: 9px;
+    --r-chip: 6px;
+    --ease-decelerate: cubic-bezier(0, 0, .2, 1);
+    --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text-1);
+    font: 13px/1.5 "Segoe UI Variable", "Inter", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  .app { height: 100vh; display: flex; flex-direction: column; }
+  .spacer { flex: 1; }
+  svg { display: block; }
+
+  /* ---------- App Bar ---------- */
+  .appbar {
+    height: 58px; flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+    padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-1); z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand__logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #3B82F6, #2563EB); color: #fff;
+    display: grid; place-items: center; box-shadow: 0 2px 6px rgba(37,99,235,.35);
+  }
+  .brand__title { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .brand__sub { font-size: 11px; color: var(--text-3); margin-top: -1px; }
+  .statuschip {
+    display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px;
+    border-radius: 999px; background: var(--surface-3); color: var(--text-2);
+    font-size: 12px; font-weight: 600; border: 1px solid var(--border);
+  }
+  .statuschip__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .statuschip.on { background: var(--rec-soft); color: var(--rec); border-color: #F6C9C9; }
+  .statuschip.on .statuschip__dot { background: var(--rec); animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220,38,38,.5); }
+    70% { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+    100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+    border-radius: var(--r-ctl); font: inherit; font-size: 13px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: background .15s, border-color .15s, box-shadow .15s, transform .1s;
+  }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .btn--primary { background: var(--brand); color: #fff; }
+  .btn--primary:hover:not(:disabled) { background: var(--brand-600); box-shadow: 0 2px 8px rgba(37,99,235,.28); }
+  .btn--start { background: var(--ok); color: #fff; }
+  .btn--start:hover:not(:disabled) { background: #15803D; box-shadow: 0 2px 8px rgba(22,163,74,.28); }
+  .btn--stop { background: #fff; color: var(--rec); border-color: #F1BFBF; }
+  .btn--stop:hover:not(:disabled) { background: var(--rec-soft); }
+  .btn--ghost { background: #fff; color: var(--text-2); border-color: var(--border); }
+  .btn--ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text-1); }
+  .iconbtn {
+    width: 36px; height: 36px; border-radius: var(--r-ctl); display: grid; place-items: center;
+    cursor: pointer; background: #fff; border: 1px solid var(--border); color: var(--text-2);
+    transition: background .15s, color .15s, transform .1s;
+  }
+  .iconbtn:hover { background: var(--surface-3); color: var(--text-1); }
+  .iconbtn:active { transform: scale(.95); }
+  .iconbtn.plain { background: transparent; border: none; }
+  .iconbtn.plain:hover { background: var(--surface-3); }
+
+  /* ---------- Workspace ---------- */
+  .workspace {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: 14px; padding: 14px;
+  }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel);
+    box-shadow: var(--shadow-1); display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  }
+  .panel__head {
+    height: 52px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    padding: 0 16px; border-bottom: 1px solid var(--border);
+  }
+  .panel__title { font-size: 13.5px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+  .count {
+    min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px;
+    background: var(--brand-soft); color: var(--brand); font-size: 11.5px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .search { position: relative; display: flex; align-items: center; }
+  .search svg { position: absolute; left: 9px; color: var(--text-3); pointer-events: none; }
+  .search input {
+    height: 36px; width: 190px; padding: 0 10px 0 30px; border: 1px solid var(--border);
+    border-radius: var(--r-ctl); background: var(--surface-2); color: var(--text-1);
+    font: inherit; font-size: 13px; outline: none; transition: border-color .15s, background .15s;
+  }
+  .search input:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px var(--brand-soft); }
+
+  /* ---------- Rooms table ---------- */
+  .tablewrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .thead, .row {
+    display: grid;
+    grid-template-columns: 74px 84px minmax(150px, 1fr) 88px minmax(110px, .85fr) 76px;
+    gap: 10px; align-items: center; padding: 0 16px;
+  }
+  .thead {
+    height: 38px; flex-shrink: 0; background: var(--surface-2); border-bottom: 1px solid var(--border);
+    font-size: 11.5px; font-weight: 600; color: var(--text-3); letter-spacing: .02em;
+  }
+  .thead span:last-child { text-align: right; }
+  .tbody { flex: 1; overflow: auto; padding: 6px 0; }
+  .tbody::-webkit-scrollbar, .console::-webkit-scrollbar { width: 10px; height: 10px; }
+  .tbody::-webkit-scrollbar-thumb, .console::-webkit-scrollbar-thumb {
+    background: #D3DAE6; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box;
+  }
+  .row { height: 52px; border-bottom: 1px solid var(--surface-3); transition: background .12s, opacity .16s, transform .16s; }
+  .row:hover { background: var(--surface-2); }
+  .row.is-off { opacity: .6; }
+  .row.removing { opacity: 0; transform: translateX(10px); }
+
+  .rstatus { display: inline-flex; align-items: center; gap: 6px; height: 24px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .rstatus .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+  .row.is-off .rstatus { color: var(--warn); }
+  .row.is-off .rstatus .dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+
+  .pchip {
+    display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-chip);
+    font-size: 11.5px; font-weight: 700; border: 1px solid transparent;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  input.cell, select.cell {
+    width: 100%; height: 34px; padding: 0 9px; font: inherit; font-size: 12.5px; color: var(--text-1);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; outline: none;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  input.cell:focus, select.cell:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px var(--brand-soft); }
+  select.cell {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 8px center; padding-right: 26px;
+  }
+
+  .rowactions { display: flex; gap: 6px; justify-content: flex-end; }
+  .rowactions button {
+    width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+    border: 1px solid var(--border); background: #fff; color: var(--text-2); cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .rowactions .act-pause:hover { color: var(--warn); border-color: #EBD3AE; background: var(--warn-soft); }
+  .rowactions .act-resume:hover { color: var(--ok); border-color: #B6E3C6; background: var(--ok-soft); }
+  .rowactions .act-del:hover { color: var(--rec); border-color: #F1BFBF; background: var(--rec-soft); }
+
+  .empty { padding: 54px 20px; text-align: center; color: var(--text-3); }
+  .empty svg { margin: 0 auto 12px; color: #C4CDDA; }
+  .empty b { display: block; color: var(--text-2); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+
+  /* ---------- Log console ---------- */
+  .console {
+    flex: 1; overflow: auto; margin: 0; padding: 12px 16px;
+    font: 12px/1.6 "Cascadia Code", "Consolas", monospace;
+    background: var(--surface-2); color: var(--text-2); white-space: pre-wrap; word-break: break-all;
+  }
+  .console .ln { padding: 1px 0; }
+  .console .ln.err { color: var(--rec); }
+  .console .ln.ok { color: var(--ok); }
+  .console .ln.warn { color: var(--warn); }
+  .logfoot {
+    height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-2); background: #fff;
+  }
+  .logfoot span { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Status bar ---------- */
+  .statusbar {
+    height: 34px; flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+    padding: 0 16px; background: var(--surface); border-top: 1px solid var(--border);
+    color: var(--text-2); font-size: 12px;
+  }
+  .sb-item { display: inline-flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+  .sb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .sb-dot.on { background: var(--rec); animation: pulse 1.4s infinite; }
+
+  /* ---------- Switch ---------- */
+  input[type="checkbox"] {
+    -webkit-appearance: none; appearance: none; width: 38px; height: 22px; border-radius: 999px;
+    background: #C8D2E0; position: relative; cursor: pointer; flex-shrink: 0; outline: none;
+    transition: background .18s var(--ease-standard);
+  }
+  input[type="checkbox"]::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.3); transition: transform .18s var(--ease-standard);
+  }
+  input[type="checkbox"]:checked { background: var(--brand); }
+  input[type="checkbox"]:checked::after { transform: translateX(16px); }
+  input[type="checkbox"]:focus-visible { box-shadow: 0 0 0 3px var(--brand-soft); }
+
+  /* ---------- Drawer ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(15,23,42,.32); opacity: 0; pointer-events: none; transition: opacity .28s var(--ease-decelerate); z-index: 30; backdrop-filter: blur(1px); }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: 388px; max-width: 92vw;
+    background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-2); z-index: 40;
+    display: flex; flex-direction: column; transform: translateX(100%); transition: transform .3s var(--ease-decelerate);
+  }
+  .drawer.open { transform: none; }
+  .drawer__head { height: 58px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .drawer__title { font-size: 14px; font-weight: 650; }
+  .drawer__body { flex: 1; overflow: auto; padding: 16px; }
+  .drawer__body::-webkit-scrollbar { width: 10px; }
+  .drawer__body::-webkit-scrollbar-thumb { background: #D3DAE6; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  .drawer__foot { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--border); background: var(--surface-2); }
+  .group { margin-bottom: 22px; }
+  .group__title { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin: 0 0 10px; }
+  .field { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .field > label { font-size: 12.5px; color: var(--text-2); }
+  .field input[type="text"], .field input[type="number"], .field select {
+    width: 100%; height: 36px; padding: 0 10px; font: inherit; font-size: 12.5px; color: var(--text-1);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; outline: none;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px var(--brand-soft); }
+  .field select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+  }
+  .field--row { grid-template-columns: 96px auto; }
+  .inline { display: flex; align-items: center; gap: 10px; }
+  .inline input[type="number"] { width: 96px; }
+  .field input[type="number"] { }
+  .unit { font-size: 12px; color: var(--text-3); }
+  .mrow { display: flex; gap: 8px; }
+  .mrow input { flex: 1; }
+  .mrow .btn { height: 36px; flex-shrink: 0; }
+
+  /* ---------- Modal ---------- */
+  .modal {
+    position: fixed; inset: 0; background: rgba(15,23,42,.34); z-index: 50;
+    display: grid; place-items: center; opacity: 0; pointer-events: none;
+    transition: opacity .2s var(--ease-standard); backdrop-filter: blur(1px);
+  }
+  .modal.open { opacity: 1; pointer-events: auto; }
+  .modal__card {
+    width: 452px; max-width: 92vw; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-2);
+    transform: translateY(10px) scale(.98); transition: transform .22s var(--ease-decelerate);
+  }
+  .modal.open .modal__card { transform: none; }
+  .modal__head { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+  .modal__title { font-size: 15px; font-weight: 650; }
+  .modal__body { padding: 16px 18px; }
+  .modal__foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; background: var(--surface-2); border-radius: 0 0 16px 16px; }
+  .mfield { margin-bottom: 13px; }
+  .mfield label { display: block; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+  .mfield input, .mfield select {
+    width: 100%; height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--surface-2); color: var(--text-1); font: inherit; font-size: 13px; outline: none;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  .mfield input:focus, .mfield select:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px var(--brand-soft); }
+  .mfield select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px;
+  }
+  .mfield .mrow .btn { height: 38px; }
+  .req { color: var(--rec); }
+  .merr { display: none; color: var(--rec); font-size: 12px; margin-top: 4px; }
+  .merr.show { display: block; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: 48px; transform: translate(-50%, 12px);
+    background: #0F172A; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px;
+    box-shadow: 0 8px 28px rgba(15,23,42,.28); opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s var(--ease-decelerate); z-index: 60;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <div class="brand">
+      <span class="brand__logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></svg>
+      </span>
+      <div class="brand__text">
+        <div class="brand__title">直播录制管理器</div>
+        <div class="brand__sub">DouyinLiveRecorder</div>
+      </div>
+    </div>
+    <span class="statuschip" id="statusPill"><span class="statuschip__dot"></span><span id="statusText">未运行</span></span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="btnOpenFolder" title="打开保存目录">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+    <button class="iconbtn" id="btnSettings" title="设置">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button class="btn btn--start" id="btnStart">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>开始录制
+    </button>
+    <button class="btn btn--stop" id="btnStop" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>停止录制
+    </button>
+  </header>
+
+  <main class="workspace">
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">直播间 <span class="count" id="roomCount">0</span></div>
+        <span class="spacer"></span>
+        <div class="search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="search" placeholder="搜索地址 / 备注" />
+        </div>
+        <button class="btn btn--ghost" id="btnPauseAll">全部暂停</button>
+        <button class="btn btn--primary" id="btnAdd">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>添加直播间
+        </button>
+      </div>
+      <div class="tablewrap">
+        <div class="thead">
+          <span>状态</span><span>平台</span><span>直播间地址</span><span>画质</span><span>备注</span><span>操作</span>
+        </div>
+        <div class="tbody" id="rooms"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">运行日志</div>
+        <span class="spacer"></span>
+        <div class="inline" style="gap:8px">
+          <input type="checkbox" id="autoScroll" checked />
+          <span style="font-size:12px;color:var(--text-2)">自动滚动</span>
+        </div>
+        <button class="btn btn--ghost" id="btnClearLog">清屏</button>
+      </div>
+      <div class="console" id="log"></div>
+      <div class="logfoot">
+        <span id="statMonitoring">监测中 0</span>
+        <span id="statElapsed">已运行 00:00:00</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span class="sb-item"><span class="sb-dot" id="sbDot"></span><span id="sbState">空闲</span></span>
+    <span class="sb-item" id="sbMonitor">监测 0</span>
+    <span class="sb-item" id="sbElapsed">时长 00:00:00</span>
+    <span class="spacer"></span>
+    <span class="sb-item">DouyinLiveRecorder · v4.0.7 </span>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer__head">
+    <div class="drawer__title">全局设置</div>
+    <span class="spacer"></span>
+    <button class="iconbtn plain" id="btnCloseSettings" title="关闭">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer__body">
+    <section class="group">
+      <h3 class="group__title">录制</h3>
+      <div class="field"><label>保存路径</label>
+        <div class="mrow"><input type="text" id="save_path" placeholder="点击「选择…」设置保存目录" /><button class="btn btn--ghost" id="pick_path">选择…</button></div>
+      </div>
+      <div class="field"><label>保存格式</label><select id="save_format"></select></div>
+      <div class="field"><label>默认画质</label><select id="default_quality"></select></div>
+      <div class="field field--row"><label>分段录制</label><div class="inline"><input type="checkbox" id="split_enabled" /><input type="number" id="split_time" min="60" step="60" /><span class="unit">秒</span></div></div>
+      <div class="field field--row"><label>完成后转 mp4</label><input type="checkbox" id="convert_mp4" /></div>
+      <div class="field field--row"><label>按作者建文件夹</label><input type="checkbox" id="folder_by_author" /></div>
+    </section>
+    <section class="group">
+      <h3 class="group__title">监测</h3>
+      <div class="field"><label>循环间隔</label><input type="number" id="loop_interval" min="30" step="10" /></div>
+      <div class="field"><label>访问线程数</label><input type="number" id="max_threads" min="1" step="1" /></div>
+    </section>
+    <section class="group">
+      <h3 class="group__title">网络与代理</h3>
+      <div class="field field--row"><label>使用代理</label><input type="checkbox" id="use_proxy" /></div>
+      <div class="field"><label>代理地址</label><input type="text" id="proxy_addr" placeholder="如 127.0.0.1:7890" /></div>
+    </section>
+    <section class="group">
+      <h3 class="group__title">Cookie（高级，可选）</h3>
+      <div class="field"><label>抖音</label><input type="text" id="douyin_cookie" /></div>
+      <div class="field"><label>快手</label><input type="text" id="kuaishou_cookie" /></div>
+      <div class="field"><label>B站</label><input type="text" id="bilibili_cookie" /></div>
+      <div class="field"><label>小红书</label><input type="text" id="xhs_cookie" /></div>
+      <div class="field"><label>TikTok</label><input type="text" id="tiktok_cookie" /></div>
+    </section>
+  </div>
+  <div class="drawer__foot">
+    <button class="btn btn--ghost" id="btnCloseSettings2">关闭</button>
+    <button class="btn btn--primary" id="btnSave">保存设置</button>
+  </div>
+</aside>
+
+<div class="modal" id="modal">
+  <div class="modal__card">
+    <div class="modal__head">
+      <div class="modal__title">添加直播间</div>
+      <span class="spacer"></span>
+      <button class="iconbtn plain" id="mClose" title="关闭">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="mfield">
+        <label>直播间地址 <span class="req">*</span></label>
+        <input id="m_url" placeholder="https://live.douyin.com/..." />
+      </div>
+      <div class="mfield">
+        <label>保存目录 <span class="req">*</span>（全局保存位置）</label>
+        <div class="mrow">
+          <input id="m_save_dir" placeholder="选择或输入保存目录" />
+          <button class="btn btn--ghost" id="m_pick">选择…</button>
+        </div>
+      </div>
+      <div class="mfield">
+        <label>画质</label>
+        <select id="m_quality"></select>
+      </div>
+      <div class="mfield">
+        <label>备注 / 主播名</label>
+        <input id="m_name" placeholder="可选" />
+      </div>
+      <div class="merr" id="m_err"></div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="mCancel">取消</button>
+      <button class="btn btn--primary" id="mOk">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = { rooms: [], qualities: [], formats: [], suggested_save_dir: "" };
+let lastSig = "";
+let logCursor = 0;
+let settingsFilled = false;
+const SETTING_KEYS = ["save_path","save_format","default_quality","folder_by_author",
+  "split_enabled","split_time","convert_mp4","loop_interval","max_threads","use_proxy",
+  "proxy_addr","douyin_cookie","kuaishou_cookie","bilibili_cookie","xhs_cookie","tiktok_cookie"];
+
+const PLATFORMS = [
+  [/douyin\.com|iesdouyin/i, "抖音", "#FE2C55"],
+  [/tiktok\.com/i, "TikTok", "#111111"],
+  [/kuaishou\.com/i, "快手", "#FF4906"],
+  [/huya\.com/i, "虎牙", "#E89100"],
+  [/douyu\.com/i, "斗鱼", "#FF6A00"],
+  [/yy\.com/i, "YY", "#0F9BE0"],
+  [/bilibili\.com/i, "B站", "#00A1D6"],
+  [/xiaohongshu\.com|xhslink/i, "小红书", "#FF2442"],
+  [/bigo\.tv|bigovideo/i, "BIGO", "#00BFA0"],
+  [/cc\.163\.com/i, "网易CC", "#D3222A"],
+  [/sooplive|afreecatv/i, "SOOP", "#0FB3E0"],
+  [/pandalive/i, "PandaTV", "#FF6E7F"],
+  [/winktv/i, "WinkTV", "#7C5CFF"],
+  [/flextv|ttinglive/i, "FlexTV", "#3B82F6"],
+  [/popkontv/i, "PopkonTV", "#F0913A"],
+  [/twitcasting/i, "TwitCasting", "#2B7FE0"],
+  [/twitch\.tv/i, "Twitch", "#9146FF"],
+  [/youtube\.com|youtu\.be/i, "YouTube", "#FF0000"],
+  [/showroom-live/i, "ShowRoom", "#E4007F"],
+  [/chzzk\.naver/i, "CHZZK", "#00D68F"],
+  [/acfun/i, "Acfun", "#FD4C5D"],
+  [/miguvideo/i, "咪咕", "#E60012"],
+  [/huajiao\.com/i, "花椒", "#FF4C39"],
+  [/kugou\.com/i, "酷狗", "#2CA2F9"],
+  [/shopee|shp\.ee/i, "Shopee", "#EE4D2D"],
+];
+
+const ICON = {
+  pause: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>',
+  play: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
+};
+
+function $(id) { return document.getElementById(id); }
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 1900);
+}
+
+async function api(path, method, body) {
+  const opt = { method: method || "GET" };
+  if (body !== undefined) {
+    opt.headers = { "Content-Type": "application/json" };
+    opt.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opt);
+  try { return await res.json(); } catch (e) { return { ok: false, msg: "请求失败" }; }
+}
+
+function isEditing() {
+  const a = document.activeElement;
+  if (!a || !a.closest || !a.closest("#rooms")) return false;
+  return ["INPUT", "SELECT", "TEXTAREA"].indexOf(a.tagName) >= 0;
+}
+
+function hexToRgba(hex, a) {
+  const h = hex.replace("#", "");
+  return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${a})`;
+}
+
+function platformOf(url) {
+  url = url || "";
+  for (const [re, name, color] of PLATFORMS) if (re.test(url)) return { name, color };
+  try {
+    const host = new URL(url.includes("://") ? url : "https://" + url).hostname.replace(/^www\./, "");
+    return { name: host || "未知", color: "#64748B" };
+  } catch (e) { return { name: "未知", color: "#64748B" }; }
+}
+
+function signature(list) {
+  return JSON.stringify((list || []).map(r => [r.url || "", r.quality || "", r.name || "", !!r.enabled]));
+}
+
+function currentFilter() { return ($("search").value || "").trim().toLowerCase(); }
+
+function applyRowState(row, room) {
+  row.classList.toggle("is-off", !room.enabled);
+  const status = row.querySelector(".rstatus");
+  if (status) status.innerHTML = '<span class="dot"></span>' + (room.enabled ? "启用" : "已暂停");
+  const btn = row.querySelector(".rowactions button");
+  if (btn) {
+    btn.className = room.enabled ? "act-pause" : "act-resume";
+    btn.innerHTML = room.enabled ? ICON.pause : ICON.play;
+    btn.title = room.enabled ? "暂停" : "恢复";
+  }
+}
+
+function roomRow(room) {
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const status = document.createElement("div");
+  status.className = "rstatus";
+
+  const pf = platformOf(room.url);
+  const plat = document.createElement("span");
+  plat.className = "pchip";
+  plat.style.color = pf.color;
+  plat.style.background = hexToRgba(pf.color, 0.1);
+  plat.style.borderColor = hexToRgba(pf.color, 0.22);
+  plat.textContent = pf.name;
+  plat.title = pf.name;
+
+  const url = document.createElement("input");
+  url.className = "cell"; url.type = "text"; url.value = room.url || ""; url.placeholder = "https://直播间地址";
+
+  const sel = document.createElement("select");
+  sel.className = "cell";
+  sel.innerHTML = '<option value="">默认</option>' +
+    state.qualities.map(q => `<option value="${q}" ${q === room.quality ? "selected" : ""}>${q}</option>`).join("");
+
+  const name = document.createElement("input");
+  name.className = "cell"; name.type = "text"; name.value = room.name || ""; name.placeholder = "备注 / 主播名";
+
+  const actions = document.createElement("div");
+  actions.className = "rowactions";
+  const pause = document.createElement("button");
+  const del = document.createElement("button");
+  del.className = "act-del"; del.innerHTML = ICON.trash; del.title = "删除";
+  actions.append(pause, del);
+
+  row.append(status, plat, url, sel, name, actions);
+  applyRowState(row, room);
+
+  function touch() { lastSig = signature(state.rooms); }
+
+  async function persist() {
+    const oldUrl = room.url || "";
+    const newUrl = url.value.trim();
+    if (!newUrl) return;
+    const quality = sel.value, nm = name.value.trim();
+    const res = await api("/api/room/update", "POST", { old_url: oldUrl, url: newUrl, quality, name: nm });
+    if (res.ok) {
+      if (newUrl !== room.url) {
+        const np = platformOf(newUrl);
+        plat.textContent = np.name; plat.title = np.name;
+        plat.style.color = np.color;
+        plat.style.background = hexToRgba(np.color, 0.1);
+        plat.style.borderColor = hexToRgba(np.color, 0.22);
+      }
+      room.url = newUrl; room.quality = quality; room.name = nm;
+      lastSig = signature(state.rooms);
+    } else if (res.msg) toast(res.msg);
+  }
+  url.addEventListener("change", persist);
+  sel.addEventListener("change", persist);
+  name.addEventListener("change", persist);
+
+  pause.onclick = async () => {
+    const target = room.url || url.value.trim();
+    if (!target) { toast("请先填写直播间地址"); return; }
+    const next = !room.enabled;
+    room.enabled = next; applyRowState(row, room); touch();   // 立即反馈
+    const res = await api("/api/room/toggle", "POST", { url: target, enabled: next });
+    if (!res.ok) { room.enabled = !next; applyRowState(row, room); touch(); toast(res.msg || "操作失败"); }
+  };
+
+  del.onclick = async () => {
+    const target = room.url || "";
+    const idx = state.rooms.indexOf(room);
+    if (idx >= 0) state.rooms.splice(idx, 1);   // 立即移除
+    row.classList.add("removing");
+    setTimeout(() => row.remove(), 160);
+    lastSig = signature(state.rooms);
+    updateCount();
+    if (target) {
+      const res = await api("/api/room/delete", "POST", { url: target });
+      if (!res.ok) {
+        state.rooms.splice(idx < 0 ? 0 : idx, 0, room);
+        renderRooms(true);
+        toast(res.msg || "删除失败");
+      }
+    }
+  };
+
+  return row;
+}
+
+function updateCount() { $("roomCount").textContent = state.rooms.length; }
+
+function renderRooms(force) {
+  const box = $("rooms");
+  const filter = currentFilter();
+  const match = (r) => !filter || (r.url || "").toLowerCase().includes(filter) || (r.name || "").toLowerCase().includes(filter);
+  box.innerHTML = "";
+  const list = state.rooms.filter(match);
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.innerHTML = '<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg>'
+      + '<b>' + (filter ? "没有匹配的直播间" : "还没有直播间") + '</b>'
+      + (filter ? "换个关键词试试" : "点击右上角「添加直播间」开始");
+    box.appendChild(empty);
+  } else {
+    list.forEach(r => box.appendChild(roomRow(r)));
+  }
+  lastSig = signature(state.rooms);
+  updateCount();
+  const anyEnabled = state.rooms.some(r => r.enabled);
+  $("btnPauseAll").textContent = (state.rooms.length && !anyEnabled) ? "全部恢复" : "全部暂停";
+}
+
+function fillSettings(settings) {
+  for (const key of SETTING_KEYS) {
+    const el = $(key);
+    if (!el) continue;
+    const v = settings[key];
+    if (el.type === "checkbox") el.checked = !!v;
+    else if (v !== undefined && v !== null) el.value = v;
+  }
+  $("save_format").innerHTML = state.formats
+    .map(f => `<option value="${f}" ${f === settings.save_format ? "selected" : ""}>${f}</option>`).join("");
+  $("default_quality").innerHTML = state.qualities
+    .map(x => `<option value="${x}" ${x === settings.default_quality ? "selected" : ""}>${x}</option>`).join("");
+}
+
+function collectSettings() {
+  const settings = {};
+  for (const key of SETTING_KEYS) {
+    const el = $(key);
+    if (!el) continue;
+    settings[key] = el.type === "checkbox" ? el.checked : el.value;
+  }
+  return settings;
+}
+
+function appendLog(lines) {
+  if (!lines.length) return;
+  const logEl = $("log");
+  const auto = $("autoScroll").checked;
+  const nearBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
+  const frag = document.createDocumentFragment();
+  for (const item of lines) {
+    const span = document.createElement("div");
+    const text = item.text;
+    span.className = "ln";
+    if (/错误|失败|error|Error|Exception|Traceback/.test(text)) span.classList.add("err");
+    else if (/警告|warn|缺少|跳过/.test(text)) span.classList.add("warn");
+    else if (/成功|完成|√|已开始|已停止/.test(text)) span.classList.add("ok");
+    span.textContent = text;
+    frag.appendChild(span);
+    logCursor = item.seq;
+  }
+  logEl.appendChild(frag);
+  while (logEl.childNodes.length > 3000) logEl.removeChild(logEl.firstChild);
+  if (auto && nearBottom) logEl.scrollTop = logEl.scrollHeight;
+}
+
+function fmtElapsed(sec) {
+  const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+  const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+  const s = String(sec % 60).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
+async function refreshState() {
+  const data = await api("/api/state");
+  state.rooms = data.rooms || [];
+  state.qualities = data.qualities || state.qualities;
+  state.formats = data.formats || state.formats;
+  state.suggested_save_dir = data.suggested_save_dir || state.suggested_save_dir;
+  renderRooms(true);
+  if (!settingsFilled) { fillSettings(data.settings || {}); settingsFilled = true; }
+}
+
+async function poll() {
+  try {
+    const st = await api("/api/status");
+    const running = st.running;
+    const el = fmtElapsed(st.elapsed);
+    $("statusPill").classList.toggle("on", running);
+    $("statusText").textContent = running ? "录制中" : "未运行";
+    $("btnStart").disabled = running;
+    $("btnStop").disabled = !running;
+    $("statMonitoring").textContent = "监测中 " + st.monitoring;
+    $("statElapsed").textContent = "已运行 " + el;
+    $("sbDot").classList.toggle("on", running);
+    $("sbState").textContent = running ? "录制中" : "空闲";
+    $("sbMonitor").textContent = "监测 " + st.monitoring;
+    $("sbElapsed").textContent = "时长 " + el;
+
+    const logs = await api("/api/logs?after=" + logCursor);
+    appendLog(logs.lines || []);
+
+    if (!isEditing()) {
+      const data = await api("/api/state");
+      state.suggested_save_dir = data.suggested_save_dir || state.suggested_save_dir;
+      const rooms = data.rooms || [];
+      if (signature(rooms) !== lastSig) {
+        state.rooms = rooms;
+        state.qualities = data.qualities || state.qualities;
+        state.formats = data.formats || state.formats;
+        renderRooms(true);
+      }
+      if (!settingsFilled) { fillSettings(data.settings || {}); settingsFilled = true; }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function init() {
+  const data = await api("/api/state");
+  state.rooms = data.rooms || [];
+  state.qualities = data.qualities || [];
+  state.formats = data.formats || [];
+  state.suggested_save_dir = data.suggested_save_dir || "";
+  renderRooms(true);
+  fillSettings(data.settings || {});
+  settingsFilled = true;
+  poll();
+  setInterval(poll, 2000);
+}
+
+/* ---------- Drawer ---------- */
+function openDrawer(open) {
+  $("drawer").classList.toggle("open", open);
+  $("scrim").classList.toggle("open", open);
+}
+$("btnSettings").onclick = () => openDrawer(true);
+$("btnCloseSettings").onclick = () => openDrawer(false);
+$("btnCloseSettings2").onclick = () => openDrawer(false);
+$("scrim").onclick = () => openDrawer(false);
+
+/* ---------- Modal ---------- */
+function openModal() {
+  $("m_err").classList.remove("show");
+  $("m_url").value = "";
+  $("m_name").value = "";
+  $("m_save_dir").value = ($("save_path").value || "").trim() || state.suggested_save_dir || "";
+  $("m_quality").innerHTML = '<option value="">默认</option>' +
+    state.qualities.map(q => `<option value="${q}">${q}</option>`).join("");
+  $("modal").classList.add("open");
+  setTimeout(() => $("m_url").focus(), 60);
+}
+function closeModal() { $("modal").classList.remove("open"); }
+function modalError(msg) { const e = $("m_err"); e.textContent = msg; e.classList.add("show"); }
+
+async function pickFolderInto(inputEl) {
+  toast("请在弹出的窗口中选择文件夹…");
+  const r = await api("/api/pick-folder", "POST", {});
+  if (r && r.ok && r.path) { inputEl.value = r.path; return true; }
+  if (r && r.msg) toast(r.msg);
+  return false;
+}
+
+$("m_pick").onclick = async () => { await pickFolderInto($("m_save_dir")); };
+$("pick_path").onclick = async () => { await pickFolderInto($("save_path")); };
+$("btnOpenFolder").onclick = async () => {
+  const res = await api("/api/open-folder", "POST", {});
+  if (res && res.msg) toast(res.msg);
+  if (res && !res.ok && /设置保存目录/.test(res.msg || "")) openDrawer(true);
+};
+$("mClose").onclick = closeModal;
+$("mCancel").onclick = closeModal;
+$("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal(); });
+$("mOk").onclick = async () => {
+  const url = $("m_url").value.trim();
+  const dir = $("m_save_dir").value.trim();
+  if (!url) { modalError("请填写直播间地址"); return; }
+  if (!dir) { modalError("请选择保存目录"); return; }
+  const quality = $("m_quality").value;
+  const name = $("m_name").value.trim();
+  if (dir !== ($("save_path").value || "").trim()) {
+    const sr = await api("/api/settings", "POST", { settings: { save_path: dir } });
+    if (sr.ok) $("save_path").value = dir;
+  }
+  const res = await api("/api/room/add", "POST", { url, quality, name });
+  if (!res.ok) { modalError(res.msg || "添加失败"); return; }
+  closeModal();
+  toast("已添加");
+  refreshState();
+};
+$("m_url").addEventListener("keydown", (e) => { if (e.key === "Enter") $("m_save_dir").focus(); });
+$("m_save_dir").addEventListener("keydown", (e) => { if (e.key === "Enter") $("m_name").focus(); });
+
+/* ---------- Toolbar ---------- */
+$("btnAdd").onclick = openModal;
+$("search").addEventListener("input", renderRooms);
+$("btnPauseAll").onclick = async () => {
+  const anyEnabled = state.rooms.some(r => r.enabled);
+  const next = !anyEnabled;
+  state.rooms.forEach(r => { if (!!r.enabled === anyEnabled) { r.enabled = next; } });
+  renderRooms(true);   // 立即反映
+  for (const r of state.rooms) {
+    if (r.enabled === next) await api("/api/room/toggle", "POST", { url: r.url, enabled: next });
+  }
+  toast(next ? "已全部暂停" : "已全部恢复");
+};
+$("btnSave").onclick = async () => {
+  const res = await api("/api/settings", "POST", { settings: collectSettings() });
+  toast(res.msg || "设置已保存");
+};
+$("btnStart").onclick = async () => {
+  const sp = ($("save_path").value || "").trim();
+  if (!sp) { toast("请先设置保存目录"); openDrawer(true); setTimeout(() => $("save_path").focus(), 300); return; }
+  const res = await api("/api/start", "POST", { settings: collectSettings() });
+  toast(res.msg || (res.ok ? "已开始" : "启动失败"));
+  poll();
+};
+$("btnStop").onclick = async () => {
+  const res = await api("/api/stop", "POST", {});
+  toast(res.msg || "已停止");
+  poll();
+};
+$("btnClearLog").onclick = () => { $("log").innerHTML = ""; };
+
+init();
+</script>
+</body>
+</html>

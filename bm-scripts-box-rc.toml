@@ -1,0 +1,15 @@
+[bmscriptsbox]
+
+[bmscriptsbox.info]
+id = "3716587c-5663-42d3-a2a8-7a0092405506"
+name = "直播录制管理器"
+version = "1.0.6"
+desc = "多平台直播录制工具脚本 | 支持抖音/TikTok/快手/虎牙/斗鱼/B站/小红书等40+平台,可视化窗口与画质/视频/音频/分段设置,自动值守录制 | 一键把直播录到本地"
+icon = "./imgs/logo.png"
+
+[bmscriptsbox.runtime]
+language = "python"
+language_version = ">=3.10"
+entry = "box_entry.py"
+terminal = "never"
+binaries = [{name = "ffmpeg"}, {name = "webview-cli"}, {name = "node"}]
